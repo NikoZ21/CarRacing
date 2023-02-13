@@ -23,11 +23,11 @@ public class CarController : MonoBehaviour
         float horizontal = Input.GetAxis("Horizontal");
 
 
-        Vector2 movement = new Vector2(horizontal, vertical);
+        Vector2 movement = new Vector2(0, vertical);
 
         movement = movement.normalized * acceleration * Time.deltaTime;
 
-        rb2d.AddForce(movement, ForceMode2D.Force);
+        rb2d.AddRelativeForce(movement, ForceMode2D.Force);
 
         speed = rb2d.velocity.magnitude;
 
@@ -35,9 +35,5 @@ public class CarController : MonoBehaviour
         {
             rb2d.velocity = rb2d.velocity.normalized * maxSpeed;
         }
-
-        float angle = Mathf.Atan2(vertical, horizontal) * Mathf.Rad2Deg;
-        Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.forward);
-        transform.rotation = Quaternion.RotateTowards(transform.rotation, rotation, rotationSpeed * Time.deltaTime);
     }
 }

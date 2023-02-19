@@ -1,39 +1,104 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEditor.UIElements;
+using UnityEditorInternal;
 using UnityEngine;
 
 public class CarController : MonoBehaviour
 {
-    public float maxSpeed = 5.0f;
-    public float acceleration = 1.0f;
-    public float rotationSpeed = 180.0f;
-    public float speed;
+    [Header("Car Settings")]
+    [SerializeField] private float accelerationFactor = 30f;
+    [SerializeField] private float turnFactor = 3.5f;
+    [SerializeField] private float driftFactor = 0.95f;
+    [SerializeField] private float maxSpeed = 20;
 
-    private Rigidbody2D rb2d;
+    [SerializeField] private Renderer _renderer;
+    [SerializeField] private Menu menu;
+
+    private float _accelerationInput = 0;
+    private float _steeringInput = 0;
+    private float _rotationAngle = 0;
+    private float _velocityVsUp = 0;
+
+    private Rigidbody2D _rb;
+    private float delay = 1;
+
 
     void Start()
     {
-        rb2d = GetComponent<Rigidbody2D>();
+        _rb = GetComponent<Rigidbody2D>();
     }
 
     private void Update()
     {
-        float vertical = Input.GetAxis("Vertical");
-        float horizontal = Input.GetAxis("Horizontal");
-
-
-        Vector2 movement = new Vector2(0, vertical);
-
-        movement = movement.normalized * acceleration * Time.deltaTime;
-
-        rb2d.AddRelativeForce(movement, ForceMode2D.Force);
-
-        speed = rb2d.velocity.magnitude;
-
-        if (speed > maxSpeed)
+        if (delay > 0)
         {
-            rb2d.velocity = rb2d.velocity.normalized * maxSpeed;
+            delay -= Time.deltaTime;
+            return;
         }
+
+        if (_renderer.isVisible == false)
+        {
+            menu.Enable();
+            this.enabled = false;
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        ApplyEngineForce();
+
+        KillOrthogonalVelocity();
+
+        ApplySteering();
+    }
+
+    private void ApplySteering()
+    {
+
+        float minSpeedBeforeAllowTurningFactor = (_rb.velocity.magnitude / 8);
+        minSpeedBeforeAllowTurningFactor = Mathf.Clamp01(minSpeedBeforeAllowTurningFactor);
+
+        _rotationAngle -= _steeringInput * turnFactor * minSpeedBeforeAllowTurningFactor;
+
+        _rb.MoveRotation(_rotationAngle);
+    }
+
+    private void ApplyEngineForce()
+    {
+        _velocityVsUp = Vector2.Dot(transform.up, _rb.velocity);
+
+        if (_velocityVsUp > maxSpeed && _accelerationInput > 0) return;
+        if (_velocityVsUp < -maxSpeed * 0.5f && _accelerationInput < 0) return;
+        if (_rb.velocity.sqrMagnitude > maxSpeed * maxSpeed && _accelerationInput > 0) return;
+
+        if (_accelerationInput == 0)
+        {
+            _rb.drag = Mathf.Lerp(_rb.drag, 3.0f, Time.fixedDeltaTime * 3);
+        }
+        else
+        {
+            _rb.drag = 0;
+        }
+
+        Vector2 engineForceVector = transform.up * _accelerationInput * accelerationFactor;
+
+        _rb.AddForce(engineForceVector, ForceMode2D.Force);
+    }
+
+    private void KillOrthogonalVelocity()
+    {
+        Vector2 forwardVellocity = transform.up * Vector2.Dot(_rb.velocity, transform.up);
+
+        Vector2 rightVelocity = transform.right * Vector2.Dot(_rb.velocity, transform.right);
+
+        _rb.velocity = forwardVellocity + rightVelocity * driftFactor;
+    }
+
+    public void SetUpInputVector(Vector2 inputVector)
+    {
+        _accelerationInput = inputVector.y;
+        _steeringInput = inputVector.x;
     }
 }
